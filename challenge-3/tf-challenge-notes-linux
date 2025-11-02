@@ -1,0 +1,188 @@
+===========================
+TERRAFORM CHALLENGE 3 NOTES
+===========================
+
+FOR_EACH BASICS
+----------------
+• for_each creates multiple resources based on:
+    - a map
+    - a set
+    - a list (converted to a set with toset())
+
+• Inside a for_each resource:
+    each.key   = the map key (ex: "instance1")
+    each.value = the object or value for that key
+
+• Use for_each instead of count when:
+    ✅ You need unique names
+    ✅ You need structured objects (instance_type, ami, description, etc.)
+    ✅ You need more than one attribute per instance
+
+
+CREATING MULTIPLE INSTANCES WITH FOR_EACH
+------------------------------------------
+Example map of objects:
+
+instances = {
+  instance1 = {
+    instance_type = "t2.micro"
+    ami           = "ami-03a6eaae9938c858c"
+    description   = "Backend API server"
+  }
+  instance2 = {
+    instance_type = "t3.micro"
+    ami           = "ami-03a6eaae9938c858c"
+    description   = "Worker node"
+  }
+}
+
+Variable definition:
+
+variable "instances" {
+  type = map(object({
+    instance_type = string
+    ami           = string
+    description   = string
+  }))
+}
+
+Resource:
+
+resource "aws_instance" "ec2" {
+  for_each = var.instances
+
+  instance_type = each.value.instance_type
+  ami           = each.value.ami
+
+  tags = {
+    Name        = each.key
+    Description = each.value.description
+  }
+}
+
+
+ADDING TAGS USING FOR_EACH
+---------------------------
+• Use each.key for the instance name.
+• Use each.value.<field> for anything inside the object.
+
+Examples:
+
+tags = {
+  Name = each.key
+}
+
+tags = {
+  Name        = each.key
+  Description = each.value.description
+  Environment = var.environment
+}
+
+To merge base tags:
+
+locals {
+  base_tags = {
+    Owner       = "Marco"
+    Environment = var.environment
+  }
+}
+
+tags = merge(
+  local.base_tags,
+  { Name = each.key }
+)
+
+
+FOR_EACH WITH SECURITY GROUP PORTS
+-----------------------------------
+Variable:
+
+variable "sg_ports" {
+  type = list(number)
+}
+
+tfvars:
+
+sg_ports = [80, 443, 8080]
+
+SG Resource:
+
+resource "aws_security_group" "main" {
+  name = "challenge3-sg"
+
+  dynamic "ingress" {
+    for_each = var.sg_ports
+    content {
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+}
+
+
+MAP vs LIST WITH FOR_EACH
+--------------------------
+Use a LIST when order matters but items must be unique.
+Convert list → set:
+
+for_each = toset(var.names)
+
+Use a MAP when:
+    - you want named items (instance1, instance2)
+    - you want multiple fields per item (objects)
+    - you want predictable resource addresses
+
+MAP is preferred for challenge 3.
+
+
+BUILDING CLEAN TFVARS FOR CHALLENGE 3
+--------------------------------------
+shared.tfvars:
+
+environment = "dev"
+
+dev.tfvars:
+
+instances = {
+  instance1 = {
+    instance_type = "t2.micro"
+    ami           = "ami-03a6eaae9938c858c"
+    description   = "Dev web server"
+  }
+}
+
+prod.tfvars:
+
+instances = {
+  instance1 = {
+    instance_type = "t3.medium"
+    ami           = "ami-03a6eaae9938c858c"
+    description   = "Production API server"
+  }
+  instance2 = {
+    instance_type = "t3.large"
+    ami           = "ami-03a6eaae9938c858c"
+    description   = "High-performance worker"
+  }
+}
+
+
+TERRAFORM COMMANDS FOR CHALLENGE 3
+----------------------------------
+terraform plan -var-file="shared.tfvars"
+terraform plan -var-file="dev.tfvars"
+terraform plan -var-file="prod.tfvars"
+
+terraform apply -var-file="shared.tfvars" -var-file="dev.tfvars"
+terraform apply -var-file="shared.tfvars" -var-file="prod.tfvars"
+
+
+BEST PRACTICES LEARNED
+-----------------------
+• Always use for_each for complex resources.
+• Use maps of objects when each resource needs multiple values.
+• Use each.key for names and each.value for dynamic values.
+• Put desc
+
