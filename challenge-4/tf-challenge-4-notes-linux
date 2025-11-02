@@ -1,0 +1,112 @@
+=====================
+TERRAFORM CHALLENGE 4
+=====================
+
+GOAL OF THE CHALLENGE
+----------------------
+Challenge 4 teaches:
+
+• How to read existing IAM users using a data source
+• How to fetch AWS account identity information
+• How to generate a dynamic IAM username using account_id
+• How to output lists and counts derived from real AWS resources
+
+
+DATA SOURCE: aws_iam_users
+--------------------------
+data "aws_iam_users" "users" {}
+
+• This is a READ-ONLY data source.
+• It fetches ALL IAM users currently in the AWS account.
+• It does NOT create or modify users.
+• It exposes attributes such as:
+      data.aws_iam_users.users.names   → list of IAM usernames
+      data.aws_iam_users.users.arns    → list of ARNs
+      data.aws_iam_users.users.ids     → list of user IDs
+
+
+DATA SOURCE: aws_caller_identity
+--------------------------------
+data "aws_caller_identity" "current_user" {}
+
+• Returns metadata about the credentials Terraform is using.
+• Commonly used attributes:
+      account_id   → AWS Account Number (12 digits)
+      arn          → ARN of the caller (root or IAM user)
+      user_id      → Internal unique ID
+
+• Does NOT require any parameters.
+
+
+IAM USER RESOURCE
+-----------------
+resource "aws_iam_user" "lb" {
+  name = "admin-user-${data.aws_caller_identity.current_user.account_id}"
+}
+
+• This CREATEs a new IAM user.
+• The username is generated dynamically using the AWS account ID.
+• Example name:
+
+      admin-user-123456789012
+
+• Using account_id ensures:
+      - The name is unique across accounts
+      - The resource is deterministic (Terraform friendly)
+      - No circular dependency is created
+      - No reliance on attributes that exist only AFTER creation
+
+
+OUTPUT: ALL IAM USER NAMES
+--------------------------
+output "name" {
+  value = data.aws_iam_users.users.names
+}
+
+• Prints a LIST of all existing IAM usernames in the account.
+• Useful for checking whether your new user was created.
+• Example output:
+
+      [
+        "root",
+        "service-user",
+        "admin-user-123456789012"
+      ]
+
+
+OUTPUT: TOTAL NUMBER OF USERS
+-----------------------------
+output "total_users" {
+  value = length(data.aws_iam_users.users.names)
+}
+
+• length() returns the total count of usernames.
+• Example:
+
+      total_users = 3
+
+• Demonstrates how to count elements in a list.
+
+
+KEY TAKEAWAYS FROM CHALLENGE 4
+-------------------------------
+• aws_iam_users is a DATA source → reads existing users.
+• aws_caller_identity provides account-level info safely.
+• IAM usernames CANNOT depend on their own ARN or post-creation values.
+• Using the account_id in the username avoids naming conflicts.
+• Outputs allow you to inspect and validate data sources.
+• Challenge 4 focuses on:
+      - Data sources
+      - Dynamic naming
+      - Outputs
+      - List handling
+      - Counting resources
+
+
+MOST IMPORTANT FUNCTIONS USED
+------------------------------
+• string interpolation:  "admin-user-${...}"
+• data source attribute references:  data.aws_caller_identity.current_user.account_id
+• list access:  data.aws_iam_users.users.names
+• length(list):  count how many items are in a list
+
