@@ -1,0 +1,92 @@
+------------------------------------------
+TERRAFORM INSTALLATION TROUBLESHOOTING NOTES
+------------------------------------------
+
+1. PROBLEM
+Terraform was not updating to the latest version. The terminal either:
+- Showed old Terraform versions (0.12.x)
+- Said Terraform was “already the newest version”
+- Still returned “terraform: command not found”
+- Had no Terraform binary in /usr/bin or /usr/local/bin
+- Acted like apt installed Terraform, but Terraform was nowhere on the system
+
+------------------------------------------
+2. WHAT WE DID
+------------------------------------------
+
+STEP 1 — Removed the old manually installed Terraform
+------------------------------------------------------
+sudo rm /usr/local/bin/terraform
+
+This confirmed the old binary was removed since:
+terraform -version
+returned:
+terraform: command not found
+
+STEP 2 — Installed HashiCorp’s official GPG key
+------------------------------------------------
+wget https://apt.releases.hashicorp.com/gpg -O hashicorp.gpg
+sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg hashicorp.gpg
+
+STEP 3 — Added the HashiCorp apt repository
+-------------------------------------------
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+| sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+STEP 4 — Updated apt
+---------------------
+sudo apt update
+
+STEP 5 — Tried installing the latest Terraform
+----------------------------------------------
+sudo apt install terraform -y
+
+APT responded:
+terraform is already the newest version (1.13.4)
+
+However, Terraform STILL did not exist:
+ls -l /usr/bin/terraform       --> No such file
+ls -l /usr/local/bin/terraform --> No such file
+
+STEP 6 — Verified the environment
+----------------------------------
+uname -a       --> Shows Linux kernel (WSL2)
+echo $0        --> Shows the shell (zsh)
+ls /           --> Shows normal Linux directory structure
+
+Confirmed:
+- It IS a Linux environment
+- But Terraform binary did NOT install into this environment
+
+------------------------------------------
+3. SUMMARY OF CURRENT STATUS
+------------------------------------------
+
+- apt successfully installed Terraform, but it installed into a DIFFERENT filesystem.
+- The active terminal session does NOT see the Terraform binary.
+- Terraform does NOT exist in:
+/usr/bin
+/usr/local/bin
+
+This means:
+Your current shell is not pointing at the same root filesystem where apt installed Terraform.
+
+------------------------------------------
+4. NEXT REQUIRED COMMANDS
+------------------------------------------
+
+To locate where Terraform actually installed:
+
+dpkg -L terraform
+which terraform
+whereis terraform
+
+These commands will reveal:
+- Where apt put the Terraform binary
+- Why this environment cannot find it
+- What the final fix needs to be
+
+------------------------------------------
+
+
