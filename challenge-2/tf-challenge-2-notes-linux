@@ -1,0 +1,148 @@
+TERRAFORM COMMANDS TO REMEMBER
+--------------------------------
+terraform plan -var-file="shared.tfvars"
+terraform plan -var-file="prod.tfvars"
+terraform plan -var-file="dev.tfvars"
+
+terraform apply -var-file="shared.tfvars"
+terraform apply -var-file="prod.tfvars"
+terraform apply -var-file="dev.tfvars"
+
+
+TERRAFORM VARIABLE + TFVARS NOTES
+----------------------------------
+• If a variable has NO default and is NOT defined in a tfvars file,
+  Terraform will ask you for the value at runtime.
+
+• Terraform tfvars precedence:
+  1. -var values (highest)
+  2. -var-file files (in order listed)
+  3. terraform.tfvars / *.auto.tfvars (autoloaded)
+  4. defaults in variables.tf (lowest)
+
+• Terraform DOES allow multiple tfvars files:
+  terraform apply -var-file="shared.tfvars" -var-file="dev.tfvars"
+
+• But Terraform DOES NOT merge two environment files defining the same variable.
+  The last file always overrides earlier files.
+
+• Correct pattern:
+  - shared.tfvars    (shared values)
+  - dev.tfvars       (dev-specific values)
+  - prod.tfvars      (prod-specific values)
+  Run with both shared + env:
+      terraform apply -var-file="shared.tfvars" -var-file="dev.tfvars"
+
+• Best SRE pattern:
+  Use a map of maps for full environment control:
+      ports = {
+        dev = { https = 443, api = 8080 },
+        prod = { https = 443, api = 8443 }
+      }
+  Access with:
+      var.ports[var.environment]["api"]
+
+
+TERRAFORM FORMATTING / VS CODE NOTES
+--------------------------------------
+• Format any Terraform file:
+    Shift + Alt + F
+
+• Install the official HashiCorp Terraform VS Code extension 
+  to enable formatting, linting, and syntax support.
+
+• Format on save:
+  VS Code Settings → "Format on Save"
+
+• If VS Code says "no formatter installed for tf":
+  install "HashiCorp Terraform" extension.
+
+
+TERRAFORM LOCK FILE NOTES
+---------------------------
+• Local backend creates:
+      .terraform.tfstate.lock.info
+
+• This file prevents multiple simultaneous Terraform executions.
+
+• If terraform gets stuck on a lock:
+  - Normally: run terraform force-unlock <ID>
+  - For your challenge: you CANNOT delete lock file, only MODIFY it.
+
+• What to modify inside the lock file:
+  - Change ID to something invalid (e.g., "INVALID-LOCK")
+  - Clear Who field ("")
+  - Backdate Created to something ancient (e.g. "1900-01-01T00:00:00Z")
+  - Change Path to something invalid ("deleted.tfstate")
+
+• If Terraform still reports it as locked:
+  - WSL/OneDrive cached the path
+  - Move the lock file to a backup folder (NOT delete):
+        mkdir ./_backup
+        mv .terraform.tfstate.lock.info ./_backup/
+  - Restart WSL:
+        wsl --shutdown
+  - Reopen VS Code and re-run terraform.
+
+
+AWS PROVIDER / EIP NOTES
+--------------------------
+• If Terraform errors:
+      "domain": this field cannot be set
+  It means you are using a provider version where "domain" is not allowed.
+
+• Fix #1:
+      terraform init -upgrade
+  This updates the provider and usually resolves provider field mismatches.
+
+• Fix #2:
+      Remove domain = "vpc"
+  In newer providers, EIP domain is set automatically.
+
+
+TERRAFORM TAGGING NOTES
+------------------------
+• Add tags directly inside any AWS resource:
+    tags = {
+      Name        = "payment_app"
+      Environment = var.environment
+      Project     = "payment-system"
+    }
+
+• Use variables for tags:
+    variable "tags" {
+      type = map(string)
+    }
+    tags = var.tags
+
+• Merge default tags + environment tags:
+    tags = merge(
+      {
+        Name = "payment_app"
+      },
+      var.tags
+    )
+
+
+TERRAFORM GENERAL TIPS
+------------------------
+• Keep your Terraform project OUTSIDE OneDrive.
+  OneDrive interferes with file locks and state.
+
+• Recommended path for WSL work:
+      ~/projects/terraform/<your-project>
+
+• Always run terraform plan before terraform apply.
+
+• Use -var-file for environment separation:
+      shared.tfvars  -> values common to all environments
+      dev.tfvars     -> dev-only settings
+      prod.tfvars    -> prod-only settings
+
+• Terraform cannot merge two conflicting environment files.
+  Instead, define shared values in shared.tfvars and env-specific values in
+  their own tfvars files.
+
+• Restart WSL if file locks persist:
+      wsl --shutdown
+
